@@ -1,0 +1,73 @@
+name: Package Desktop - Windows (fork, GitHub-hosted)
+
+on:
+  workflow_dispatch:
+    inputs:
+      signing:
+        description: '签名方式（本地自用选 unsigned）'
+        type: choice
+        options: [unsigned, signed]
+        default: unsigned
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-desktop-package-fork
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DSH_TELEMETRY_DISABLED: '1'
+      DSH_PACKAGING_PRESET: test
+      PACKAGE_SIGNING: ${{ inputs.signing }}
+      DSH_DESKTOP_UPDATE_CHANNEL: nightly
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write placeholder desktop env (.env.windows)
+        run: |
+          $lines = @(
+            'DSH_DESKTOP_APP_ID=com.deepseek.harness',
+            'DSH_DESKTOP_AUTO_UPDATE_ENV=test',
+            'DOWNLOAD_TEST_ORIGIN=https://example.com',
+            'DOWNLOAD_TEST_RELEASE_ID=00000000000000000000000000000000',
+            'DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://example.com',
+            'DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://example.com',
+            'DSH_DESKTOP_MANDATORY_UPDATE_CONFIG={"allowedAuthOrigins":["https://example.com"]}',
+            'DSH_DESKTOP_WINDOWS_SIGNATURE_CACHE_CONCURRENCY=4'
+          )
+          Set-Content -Path apps/desktop/.env.windows -Value $lines -Encoding utf8
+          Get-Content apps/desktop/.env.windows
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package unsigned
+        run: pnpm run package:desktop:win:x64:unsigned
+
+      - name: Upload package artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-unsigned
+          path: |
+            apps/desktop/.desktop-build/**
+            apps/desktop/dist/**
+          if-no-files-found: warn
+          retention-days: 7
+          include-hidden-files: true
