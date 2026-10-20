@@ -26,7 +26,6 @@ jobs:
         shell: pwsh
     env:
       DSH_TELEMETRY_DISABLED: '1'
-      DSH_PACKAGING_PRESET: test
       PACKAGE_SIGNING: ${{ inputs.signing }}
       DSH_DESKTOP_UPDATE_CHANNEL: nightly
       ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
